@@ -25,30 +25,33 @@ def main(config):
     # Data loader.
     celeba_loader = None
     rafd_loader = None
+    affectnet_loader = None
 
     if config.dataset in ['CelebA', 'Both']:
         celeba_loader = get_loader(config.celeba_image_dir, config.attr_path, config.selected_attrs,
                                    config.celeba_crop_size, config.image_size, config.batch_size,
-                                   'CelebA', config.mode, config.num_workers)
+                                   'CelebA', config.mode, None, config.num_workers)
     if config.dataset in ['RaFD', 'Both']:
         rafd_loader = get_loader(config.rafd_image_dir, None, None,
                                  config.rafd_crop_size, config.image_size, config.batch_size,
-                                 'RaFD', config.mode, config.num_workers)
-    
-
+                                 'RaFD', config.mode, None, config.num_workers)
+    if config.dataset in ['AffectNet']:
+        affectnet_loader = get_loader(config.affectnet_image_dir, None, None,
+                                 config.affectnet_crop_size, config.image_size, config.batch_size,
+                                 'AffectNet', config.mode, config.affectnet_emo_descr, config.num_workers)
     # Solver for training and testing StarGAN.
-    solver = Solver(celeba_loader, rafd_loader, config)
+    solver = Solver(celeba_loader, rafd_loader, affectnet_loader, config)
 
     if config.mode == 'train':
-        if config.dataset in ['CelebA', 'RaFD']:
+        if config.dataset in ['CelebA', 'RaFD', 'AffectNet']:
             solver.train()
-        elif config.dataset in ['Both']:
-            solver.train_multi()
+        # elif config.dataset in ['Both']:
+        #     solver.train_multi()
     elif config.mode == 'test':
-        if config.dataset in ['CelebA', 'RaFD']:
+        if config.dataset in ['CelebA', 'RaFD', 'AffectNet']:
             solver.test()
-        elif config.dataset in ['Both']:
-            solver.test_multi()
+        # elif config.dataset in ['Both']:
+        #     solver.test_multi()
 
 
 if __name__ == '__main__':
@@ -59,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--c2_dim', type=int, default=8, help='dimension of domain labels (2nd dataset)')
     parser.add_argument('--celeba_crop_size', type=int, default=178, help='crop size for the CelebA dataset')
     parser.add_argument('--rafd_crop_size', type=int, default=256, help='crop size for the RaFD dataset')
+    parser.add_argument('--affectnet_crop_size', type=int, default=112, help='crop size for the AffectNet dataset')
     parser.add_argument('--image_size', type=int, default=128, help='image resolution')
     parser.add_argument('--g_conv_dim', type=int, default=64, help='number of conv filters in the first layer of G')
     parser.add_argument('--d_conv_dim', type=int, default=64, help='number of conv filters in the first layer of D')
@@ -67,9 +71,9 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_cls', type=float, default=1, help='weight for domain classification loss')
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
-    
+
     # Training configuration.
-    parser.add_argument('--dataset', type=str, default='CelebA', choices=['CelebA', 'RaFD', 'Both'])
+    parser.add_argument('--dataset', type=str, default='CelebA', choices=['CelebA', 'RaFD', 'AffectNet', 'Both'])
     parser.add_argument('--batch_size', type=int, default=16, help='mini-batch size')
     parser.add_argument('--num_iters', type=int, default=200000, help='number of total iterations for training D')
     parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
@@ -81,7 +85,7 @@ if __name__ == '__main__':
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
     parser.add_argument('--selected_attrs', '--list', nargs='+', help='selected attributes for the CelebA dataset',
                         default=['Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Male', 'Young'])
-
+    parser.add_argument('--affectnet_emo_descr', type=str, default='emotiw', help='emotiw for categorical emotions, va for valence-arousal')
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=200000, help='test model from this step')
 
@@ -94,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--celeba_image_dir', type=str, default='data/celeba/images')
     parser.add_argument('--attr_path', type=str, default='data/celeba/list_attr_celeba.txt')
     parser.add_argument('--rafd_image_dir', type=str, default='data/RaFD/train')
+    parser.add_argument('--affectnet_image_dir', type=str, default='data/affectnet')
     parser.add_argument('--log_dir', type=str, default='stargan/logs')
     parser.add_argument('--model_save_dir', type=str, default='stargan/models')
     parser.add_argument('--sample_dir', type=str, default='stargan/samples')

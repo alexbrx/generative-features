@@ -68,8 +68,69 @@ class CelebA(data.Dataset):
         return self.num_images
 
 
-def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=128, 
-               batch_size=16, dataset='CelebA', mode='train', num_workers=1):
+class AffectNet(data.Dataset):
+    """Dataset class for the AffectNet dataset."""
+
+    def __init__(self, image_dir, affectnet_emo_descr, transform, mode):
+        """Initialize and preprocess the AffectNet dataset."""
+        self.image_dir = image_dir
+        self.affectnet_emo_descr = affectnet_emo_descr
+        self.transform = transform
+        self.mode = mode
+        self.train_dataset = []
+        self.test_dataset = []
+        self.preprocess()
+
+        if mode == 'train':
+            self.num_images = len(self.train_dataset)
+        else:
+            self.num_images = len(self.test_dataset)
+
+
+    def preprocess(self):
+        """Preprocess the AffectNet emotional description file."""
+        if self.affectnet_emo_descr == 'emotiw':
+            lines_train = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_train_emotiw.txt'), 'r')]
+            for line in lines_train:
+                filename, label = line.split()
+                self.train_dataset.append([filename, int(label)])
+            lines_test = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_test_emotiw.txt'), 'r')]
+            for line in lines_test:
+                filename, label = line.split()
+                self.test_dataset.append([filename, int(label)])
+        else:
+            lines_train = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_train_va.txt'), 'r')]
+            for line in lines_train:
+                split = line.split()
+                filename, v, a = split
+                self.train_dataset.append([filename, [float(v), float(a)]])
+            lines_test = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_test_va.txt'), 'r')]
+            for line in lines_test:
+                split = line.split()
+                filename, v, a = split
+                self.test_dataset.append([filename, [float(v), float(a)]])
+
+        print('Finished preprocessing the AffectNet dataset...')
+
+    def __getitem__(self, index):
+        """Return one image and its corresponding attribute label."""
+        if self.mode == 'train':
+            dataset = self.train_dataset
+            filename, label = dataset[index]
+            image = Image.open(os.path.join(self.image_dir, 'train', filename))
+        else:
+            dataset = self.test_dataset
+            filename, label = dataset[index]
+            image = Image.open(os.path.join(self.image_dir, 'validation', filename))
+        return self.transform(image), torch.tensor(label)
+
+    def __len__(self):
+        """Return the number of images."""
+        return self.num_images
+
+
+def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=128,
+               batch_size=16, dataset='CelebA', mode='train', affectnet_emo_descr='emotiw', num_workers=1):
     """Build and return a data loader."""
     transform = []
     if mode == 'train':
@@ -84,6 +145,8 @@ def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=1
         dataset = CelebA(image_dir, attr_path, selected_attrs, transform, mode)
     elif dataset == 'RaFD':
         dataset = ImageFolder(image_dir, transform)
+    elif dataset == 'AffectNet':
+        dataset = AffectNet(image_dir, affectnet_emo_descr, transform, mode)
 
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batch_size,
