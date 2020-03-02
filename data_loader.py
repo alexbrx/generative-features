@@ -98,7 +98,7 @@ class AffectNet(data.Dataset):
             for line in lines_test:
                 filename, label = line.split()
                 self.test_dataset.append([filename, int(label)])
-        else:
+        elif self.affectnet_emo_descr == 'va':
             lines_train = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_train_va.txt'), 'r')]
             for line in lines_train:
                 split = line.split()
@@ -109,20 +109,38 @@ class AffectNet(data.Dataset):
                 split = line.split()
                 filename, v, a = split
                 self.test_dataset.append([filename, [float(v), float(a)]])
+        elif self.affectnet_emo_descr in ['va-reg', 'va-cls']:
+            for mode, dataset in zip(['train_', 'test_'], [self.train_dataset, self.test_dataset]):
+                filenames = [line.rstrip() for line in open(os.path.join(self.image_dir, mode + 'images.txt'), 'r')]
+                labels = [int(line.rstrip()) for line in open(os.path.join(self.image_dir, mode + 'labels.txt'), 'r')]
+                predictions = [[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, mode + 'predictions.txt'), 'r')]
 
+                dataset += list(zip(filenames, labels, predictions))
+                
         print('Finished preprocessing the AffectNet dataset...')
 
     def __getitem__(self, index):
         """Return one image and its corresponding attribute label."""
-        if self.mode == 'train':
-            dataset = self.train_dataset
-            filename, label = dataset[index]
-            image = Image.open(os.path.join(self.image_dir, 'train', filename))
-        else:
-            dataset = self.test_dataset
-            filename, label = dataset[index]
-            image = Image.open(os.path.join(self.image_dir, 'validation', filename))
-        return self.transform(image), torch.tensor(label)
+        if self.affectnet_emo_descr in ['emotiw', 'va']:
+            if self.mode == 'train':
+                dataset = self.train_dataset
+                filename, label = dataset[index]
+                image = Image.open(os.path.join(self.image_dir, 'train', filename))
+            else:
+                dataset = self.test_dataset
+                filename, label = dataset[index]
+                image = Image.open(os.path.join(self.image_dir, 'validation', filename))
+            return self.transform(image), torch.tensor(label)
+        elif self.affectnet_emo_descr in ['va-reg', 'va-cls']:
+            if self.mode == 'train':
+                dataset = self.train_dataset
+                filename, label, prediction = dataset[index]
+                image = Image.open(os.path.join(self.image_dir, 'train', filename))
+            else:
+                dataset = self.test_dataset
+                filename, label, prediction = dataset[index]
+                image = Image.open(os.path.join(self.image_dir, 'validation', filename))
+            return self.transform(image), torch.tensor([label] + prediction)
 
     def __len__(self):
         """Return the number of images."""
