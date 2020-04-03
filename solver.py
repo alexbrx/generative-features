@@ -8,7 +8,27 @@ import numpy as np
 import os
 import time
 import datetime
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
+class LabelTransform(object):
+  def __init__(self, max_components_kept=14):
+    self.image_dir = '/vol/bitbucket/apg416/affectnet'
+    self.max_components_kept = max_components_kept
+    self.ss = StandardScaler()
+    self.pca = PCA()
+    self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    predictions_train = np.array([[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir,'train_predictions.txt'), 'r')])
+    self.pca.fit(self.ss.fit_transform(predictions_train))
+
+  def create_labels(self, c_org):
+    c_trg_list = []
+    for i in range(self.max_components_kept):
+      transformed_labels = self.pca.transform(self.ss.transform(c_org))
+      transformed_labels[:,1+i:] = 0
+      c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
+    return c_trg_list
 
 class Solver(object):
     """Solver for training and testing StarGAN."""
@@ -52,6 +72,7 @@ class Solver(object):
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.label_transform = LabelTransform()
 
         # Directories.
         self.log_dir = config.log_dir
@@ -175,8 +196,8 @@ class Solver(object):
 
         elif dataset == 'AffectNet':
             c_trg_list = []
-            if self.affectnet_emo_descr in ['emotiw', 'va-reg', 'va-cls']:
-                for i in range(c_dim): #One hot for simplicty, change to PCA later
+            if self.affectnet_emo_descr == 'emotiw':
+                for i in range(c_dim):
                     c_trg = self.label2onehot(torch.ones(c_org.size(0))*i, c_dim)
                     c_trg_list.append(c_trg.to(self.device))
             elif self.affectnet_emo_descr == 'va':
@@ -184,6 +205,11 @@ class Solver(object):
                     for a in [-1., -0.5, 0., 0.5, 1.]:
                         c_trg = torch.Tensor([v, a]).repeat(c_org.size(0), 1)
                         c_trg_list.append(c_trg.to(self.device))
+            elif self.affectnet_emo_descr in ['va-reg', 'va-cls']:
+                # c_trg_list = np.loadtxt('/vol/bitbucket/apg416/affectnet/vgg2pcs.txt')
+                # c_trg_list = torch.FloatTensor(c_trg_list).to(self.device)
+                # c_trg_list = [label_vec.repeat(c_org.size(0), 1) for label_vec in torch.unbind(c_trg_list)]
+                c_trg_list = self.label_transform.create_labels(c_org[:,1:])
         return c_trg_list
 
     def ccc_loss(self, x, y):
