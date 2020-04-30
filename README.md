@@ -17,8 +17,6 @@ python main.py --mode train --dataset AffectNet --affectnet_emo_descr 64d_reg  -
                --model_save_dir 64d_regflat_ccc/models --result_dir 64d_regflat_ccc/results \
                --use_ccc True --depth_concat False --d_loss_cls_type actv --pca_n_components 3 --pca_variant 'quantiles'
 
-
-
 # Example testing script
 python stargan/main.py --mode test --dataset AffectNet --affectnet_emo_descr 64d_reg --image_size 112 \
                --c_dim 64 --lambda_cls 10 --batch_size 16 --d_conv_dim 128 --g_conv_dim 128 --affectnet_image_dir affectnet \
