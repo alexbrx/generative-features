@@ -71,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_cls', type=float, default=1, help='weight for domain classification loss')
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
-
+    parser.add_argument('--lambda_cls2', type=float, default=1, help='second (extra) weight for domain classification loss')
     # Training configuration.
     parser.add_argument('--dataset', type=str, default='CelebA', choices=['CelebA', 'RaFD', 'AffectNet', 'Both'])
     parser.add_argument('--batch_size', type=int, default=16, help='mini-batch size')
@@ -85,11 +85,17 @@ if __name__ == '__main__':
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
     parser.add_argument('--selected_attrs', '--list', nargs='+', help='selected attributes for the CelebA dataset',
                         default=['Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Male', 'Young'])
+    #
     parser.add_argument('--affectnet_emo_descr', type=str, default='emotiw', help='emotiw for categorical emotions, va for valence-arousal')
     parser.add_argument('--use_ccc', type=bool, default=False, help='use ccc loss instead of mse')
+    parser.add_argument('--depth_concat', type=bool, default=True, help='perform depthwise concatenation in G')
+    parser.add_argument('--d_loss_cls_type', type=str, default='actv', help='chosen terms for classification loss')
+
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=200000, help='test model from this step')
-
+    #
+    parser.add_argument('--pca_n_components', type=int, default=0.99, help='PCA visualization number of components kept')
+    parser.add_argument('--pca_variant', type=str, default='quantiles', help='PCA visualization variant')
     # Miscellaneous.
     parser.add_argument('--num_workers', type=int, default=1)
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
