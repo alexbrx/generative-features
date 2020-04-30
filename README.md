@@ -24,5 +24,5 @@ python stargan/main.py --mode test --dataset AffectNet --affectnet_emo_descr 64d
                --model_save_dir 64d_regflat_ccc/models --result_dir 64d_regflat_ccc/results \
                --test_iters 1000000 --depth_concat False --pca_n_components 3 --pca_variant 'quantiles'
 ```
-Based on official StarGAN implementation: https://github.com/yunjey/stargan
+Based on official StarGAN implementation: https://github.com/yunjey/stargan \
 StarGAN paper: https://arxiv.org/abs/1711.09020
