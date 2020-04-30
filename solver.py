@@ -23,8 +23,7 @@ class LabelTransform(object):
 
     if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
         actvs_train = np.array([[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, 'train', 'predictions.txt'), 'r')])
-    elif self.affectnet_emo_descr in ['va-reg', 'va-cls']:
-        actvs_train = np.array([[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir,'train_predictions.txt'), 'r')])
+
     actvs_latent_train = self.pca.fit_transform(self.ss.fit_transform(actvs_train))
 
     self.stats = pd.DataFrame(actvs_latent_train).describe(percentiles=[0.1, 0.5, 0.9]).T.drop(columns=['count']) #components in rows
@@ -35,13 +34,6 @@ class LabelTransform(object):
 
     if self.pca_variant == 'quantiles':
         for i in range(self.pca.n_components_):
-            # transformed_labels_lo, transformed_labels_hi = c_org_latent, c_org_latent
-            # transformed_labels_lo[:,i] = self.stats.loc[i,'10%']
-            # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels_lo))).to(self.device))
-            # transformed_labels_lo[:,i] = self.stats.loc[i,'50%']
-            # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels_lo))).to(self.device))
-            # transformed_labels_hi[:,i] = self.stats.loc[i,'90%']
-            # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels_hi))).to(self.device))
             transformed_labels = c_org_latent
             transformed_labels[:,i] = self.stats.loc[i,'10%']
             c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
@@ -51,23 +43,6 @@ class LabelTransform(object):
             transformed_labels = c_org_latent
             transformed_labels[:,i] = self.stats.loc[i,'90%']
             c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-
-        # transformed_labels = c_org_latent
-        # transformed_labels[:,0] = self.stats.loc[i,'10%']
-        # transformed_labels[:,1] = self.stats.loc[i,'10%']
-        # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-        # transformed_labels = c_org_latent
-        # transformed_labels[:,0] = self.stats.loc[i,'90%']
-        # transformed_labels[:,1] = self.stats.loc[i,'90%']
-        # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-        # transformed_labels = c_org_latent
-        # transformed_labels[:,0] = self.stats.loc[i,'10%']
-        # transformed_labels[:,1] = self.stats.loc[i,'90%']
-        # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-        # transformed_labels = c_org_latent
-        # transformed_labels[:,0] = self.stats.loc[i,'90%']
-        # transformed_labels[:,1] = self.stats.loc[i,'10%']
-        # c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
 
     else:
         for i in range(1, self.pca.n_components_):
@@ -122,7 +97,7 @@ class Solver(object):
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if self.affectnet_emo_descr in ['64d_reg', '64d_cls', 'va-reg', 'va-cls']:
+        if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
             self.label_transform = LabelTransform(config)
 
         # Directories.
@@ -147,15 +122,6 @@ class Solver(object):
         if self.dataset in ['CelebA', 'RaFD', 'AffectNet']:
             self.G = Generator(self.g_conv_dim, self.c_dim, self.g_repeat_num, self.depth_concat)
             self.D = Discriminator(self.image_size, self.d_conv_dim, self.c_dim, self.d_repeat_num, self.affectnet_emo_descr, self.d_loss_cls_type)
-
-            # if self.affectnet_emo_descr == '64d_cls' and (self.d_loss_cls_type in ['both', 'pred']):
-            #     self.D.fc = torch.nn.Linear(self.c_dim, 7)
-            # elif self.affectnet_emo_descr == '64d_reg' and (self.d_loss_cls_type in ['both', 'pred']):
-            #     self.D.fc = torch.nn.Linear(self.c_dim, 2)
-
-        # elif self.dataset in ['Both']:
-        #     self.G = Generator(self.g_conv_dim, self.c_dim+self.c2_dim+2, self.g_repeat_num)   # 2 for mask vector.
-        #     self.D = Discriminator(self.image_size, self.d_conv_dim, self.c_dim+self.c2_dim, self.d_repeat_num)
 
         self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -262,7 +228,7 @@ class Solver(object):
                     for a in [-1., -0.5, 0., 0.5, 1.]:
                         c_trg = torch.Tensor([v, a]).repeat(c_org.size(0), 1)
                         c_trg_list.append(c_trg.to(self.device))
-            elif self.affectnet_emo_descr in ['va-reg', 'va-cls', '64d_cls']:
+            elif self.affectnet_emo_descr in ['64d_cls']:
                 # c_trg_list = np.loadtxt('/vol/bitbucket/apg416/affectnet/vgg2pcs.txt')
                 # c_trg_list = torch.FloatTensor(c_trg_list).to(self.device)
                 # c_trg_list = [label_vec.repeat(c_org.size(0), 1) for label_vec in torch.unbind(c_trg_list)]
@@ -288,9 +254,9 @@ class Solver(object):
         elif dataset == 'RaFD':
             return F.cross_entropy(logit, target)
         elif dataset == 'AffectNet':
-            if self.affectnet_emo_descr in ['emotiw', 'va-cls']:
+            if self.affectnet_emo_descr in ['emotiw']:
                 return F.cross_entropy(logit, target)
-            elif self.affectnet_emo_descr in ['va', 'va-reg']:
+            elif self.affectnet_emo_descr in ['va']:
                 if self.use_ccc:
                     return self.ccc_loss(logit, target)
                 else:
@@ -349,18 +315,6 @@ class Solver(object):
             start_iters = self.resume_iters
             self.restore_model(self.resume_iters)
 
-        # # --- converting
-        # if self.affectnet_emo_descr == '64d_cls' and (self.d_loss_cls_type in ['both', 'pred']):
-        #     self.D.fc = torch.nn.Linear(self.c_dim, 7)
-        # elif self.affectnet_emo_descr == '64d_reg' and (self.d_loss_cls_type in ['both', 'pred']):
-        #     self.D.fc = torch.nn.Linear(self.c_dim, 2)
-        # G_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(self.resume_iters))
-        # D_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(self.resume_iters))
-        # torch.save(self.G.state_dict(), G_path)
-        # torch.save(self.D.state_dict(), D_path)
-        # return 0
-        # # ---
-
         # Start training.
         print('Start training...')
         start_time = time.time()
@@ -402,18 +356,6 @@ class Solver(object):
                     c_trg = label_trg.clone().to(self.device)
                     label_org = label_org.to(self.device)       # Labels for computing classification loss.
                     label_trg = label_trg.to(self.device)       # Labels for computing classification loss.
-                elif self.affectnet_emo_descr == 'va-reg':
-                    label_org = label_org[:,1:].to(self.device)
-                    label_trg = label_trg[:,1:].to(self.device)
-                    c_org = label_org.clone().to(self.device)
-                    c_trg = label_trg.clone().to(self.device)
-                elif self.affectnet_emo_descr == 'va-cls':
-                    pred_org = label_org[:,0].clone().long().to(self.device)
-                    pred_trg = label_trg[:,0].clone().long().to(self.device)
-                    label_org = label_org[:,1:].to(self.device)
-                    label_trg = label_trg[:,1:].to(self.device)
-                    c_org = label_org.clone().to(self.device)
-                    c_trg = label_trg.clone().to(self.device)
                 elif self.affectnet_emo_descr == '64d_cls':
                     pred_org = label_org[:,0].clone().long().to(self.device)
                     pred_trg = label_trg[:,0].clone().long().to(self.device)
@@ -440,9 +382,8 @@ class Solver(object):
             # Compute loss with real images.
             out_src, out_cls = self.D(x_real)
             d_loss_real = - torch.mean(out_src)
-            if self.affectnet_emo_descr == 'va-cls':
-                d_loss_cls = self.classification_loss(out_cls, pred_org, self.dataset)
-            elif self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
+
+            if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
                 if self.d_loss_cls_type == 'actv':
                     d_loss_cls = self.classification_loss((None, out_cls), (None, actv_org), self.dataset)
                 elif self.d_loss_cls_type == 'pred':
@@ -485,13 +426,8 @@ class Solver(object):
                 x_fake = self.G(x_real, c_trg)
                 out_src, out_cls = self.D(x_fake)
                 g_loss_fake = - torch.mean(out_src)
-                # if self.affectnet_emo_descr == 'va-cls':
-                #     g_loss_cls = self.classification_loss(out_cls, pred_trg, self.dataset)
-                # else:
-                #     g_loss_cls = self.classification_loss(out_cls, label_trg, self.dataset)
-                if self.affectnet_emo_descr == 'va-cls':
-                    g_loss_cls = self.classification_loss(out_cls, pred_trg, self.dataset)
-                elif self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
+
+                if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
                     if self.d_loss_cls_type == 'actv':
                         g_loss_cls = self.classification_loss((None, out_cls), (None, actv_trg), self.dataset)
                     elif self.d_loss_cls_type == 'pred':

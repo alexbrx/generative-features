@@ -109,12 +109,6 @@ class AffectNet(data.Dataset):
                 split = line.split()
                 filename, v, a = split
                 self.test_dataset.append([filename, [float(v), float(a)]])
-        elif self.affectnet_emo_descr in ['va-reg', 'va-cls']:
-            for mode, dataset in zip(['train_', 'test_'], [self.train_dataset, self.test_dataset]):
-                filenames = [line.rstrip() for line in open(os.path.join(self.image_dir, mode + 'images.txt'), 'r')]
-                labels = [[int(line.rstrip())] for line in open(os.path.join(self.image_dir, mode + 'labels.txt'), 'r')]
-                predictions = [[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, mode + 'predictions.txt'), 'r')]
-                dataset += list(zip(filenames, labels, predictions))
         elif self.affectnet_emo_descr == '64d_cls':
             for mode, dataset in zip(['train', 'test'], [self.train_dataset, self.test_dataset]):
                 filenames = [line.rstrip() for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'images.txt'), 'r')]
@@ -142,7 +136,7 @@ class AffectNet(data.Dataset):
                 filename, label = dataset[index]
                 image = Image.open(os.path.join(self.image_dir, 'validation', filename))
             return self.transform(image), torch.tensor(label)
-        elif self.affectnet_emo_descr in ['va-reg', 'va-cls', '64d_reg', '64d_cls']:
+        elif self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
             if self.mode == 'train':
                 dataset = self.train_dataset
                 filename, label, prediction = dataset[index]
