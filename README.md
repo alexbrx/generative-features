@@ -6,7 +6,7 @@
 | *Space* |--->
 
 
-## Motivation
+<!--- ## Motivation --->
 * Typical neural network maps input to output through a superposition of learned tensor-to-tensor transformations applied by each layer. 
 * We can decipher which aspects of the image are encoded by intermediate representations by training a generative model which conditions on these representations.
 
