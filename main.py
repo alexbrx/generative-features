@@ -45,13 +45,9 @@ def main(config):
     if config.mode == 'train':
         if config.dataset in ['CelebA', 'RaFD', 'AffectNet']:
             solver.train()
-        # elif config.dataset in ['Both']:
-        #     solver.train_multi()
     elif config.mode == 'test':
         if config.dataset in ['CelebA', 'RaFD', 'AffectNet']:
             solver.test()
-        # elif config.dataset in ['Both']:
-        #     solver.test_multi()
 
 
 if __name__ == '__main__':

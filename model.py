@@ -65,9 +65,6 @@ class Generator(nn.Module):
             c = c.repeat(1, 1, x.size(2), x.size(3))
         else:
             if c.size(1) == 2: #labels are assumed to have length 2 or 64 and images are 112x112
-                # c = c.view(c.size(0), 1, 1, 2)
-                # c = c.repeat(1, 1, 112, 56)
-                # c = c.view(-1).repeat_interleave(8).view(c.size(0),1,1,-1).repeat(1,1,112,7)
                 c = c.view(-1).repeat_interleave(56).view(c.size(0),1,1,-1).repeat(1,1,112,1)
             elif c.size(1) == 64:
                 c = c.view(c.size(0), 1, 8, 8)
