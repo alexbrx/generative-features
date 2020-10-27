@@ -1,28 +1,27 @@
-# Conditional Image Generation for Black-Box Model Visualization and Interpretation
-
+## Conditional Image Generation for Black-Box Model Visualization and Interpretation
 
 <!---| ![](jpg/sample.jpg) | 
 |:--:| 
 | *Space* |--->
 
 
-<!--- ## Motivation --->
+### Motivation
 * Typical neural network maps input to output through a superposition of learned tensor-to-tensor transformations applied by each layer. 
 * We can decipher which aspects of the image are encoded by intermediate representations by training a generative model which conditions on these representations.
 
-## Model Outline
+### Model Outline
 * [StarGAN](https://arxiv.org/abs/1711.09020) is a powerful model for image-to-image translation i.e. problem of generating an artifical image based on a source image, typically by altering some qualitative aspect of the input.
 * It generates fake image from source image conditional on a prescribed target domain label (represented as a one-hot/binary vector).
 * In this work we show that analogous training principle can be used to generate meaningful samples when the conditioning vectors are continuous feature vectors extracted from the last layer of a trained classifier.
 * Such model allows for direct visualization and interpretation of the feature space.
 * Our experiments are done in the context of affective computing: we visualized the learned features of two VGG-Face networks for facial expression recognition.
 
-## Dependencies
+### Dependencies
 * [Python 3.5+](https://www.continuum.io/downloads)
 * [PyTorch 0.4.0+](http://pytorch.org/)
 * [TensorFlow 1.3+](https://www.tensorflow.org/) (optional for tensorboard)
 
-## Training networks
+### Running Code
 To train the models on AffectNet, run the training script below.
 
 ```bash
