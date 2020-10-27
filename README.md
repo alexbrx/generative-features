@@ -1,4 +1,5 @@
 # Conditional Image Generation for Black-Box Model Visualization and Interpretation
+<p align="center"><img width="50%" src="jpg/sample.jpg" /></p>
 
 ## Motivation
 * Typical neural network maps input to output through a superposition of learned tensor-to-tensor transformations applied by each layer. 
