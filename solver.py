@@ -12,45 +12,88 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import pandas as pd
 
+
 class LabelTransform(object):
-  def __init__(self, config):
-    self.image_dir = config.affectnet_image_dir
-    self.affectnet_emo_descr = config.affectnet_emo_descr
-    self.pca_variant = config.pca_variant
-    self.ss = StandardScaler()
-    self.pca = PCA(config.pca_n_components)
-    self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def __init__(self, config):
+        self.image_dir = config.affectnet_image_dir
+        self.affectnet_emo_descr = config.affectnet_emo_descr
+        self.pca_variant = config.pca_variant
+        self.ss = StandardScaler()
+        self.pca = PCA(config.pca_n_components)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
-        actvs_train = np.array([[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, 'train', 'predictions.txt'), 'r')])
+        if self.affectnet_emo_descr in ["64d_reg", "64d_cls"]:
+            actvs_train = np.array(
+                [
+                    [float(x) for x in line.rstrip().split()]
+                    for line in open(
+                        os.path.join(
+                            self.image_dir,
+                            self.affectnet_emo_descr,
+                            "train",
+                            "predictions.txt",
+                        ),
+                        "r",
+                    )
+                ]
+            )
 
-    actvs_latent_train = self.pca.fit_transform(self.ss.fit_transform(actvs_train))
+        actvs_latent_train = self.pca.fit_transform(self.ss.fit_transform(actvs_train))
 
-    self.stats = pd.DataFrame(actvs_latent_train).describe(percentiles=[0.1, 0.5, 0.9]).T.drop(columns=['count']) #components in rows
+        self.stats = (
+            pd.DataFrame(actvs_latent_train)
+            .describe(percentiles=[0.1, 0.5, 0.9])
+            .T.drop(columns=["count"])
+        )  # components in rows
 
-  def create_labels(self, c_org):
-    c_trg_list = []
-    c_org_latent = self.pca.transform(self.ss.transform(c_org))
+    def create_labels(self, c_org):
+        c_trg_list = []
+        c_org_latent = self.pca.transform(self.ss.transform(c_org))
 
-    if self.pca_variant == 'quantiles':
-        for i in range(self.pca.n_components_):
-            transformed_labels = c_org_latent
-            transformed_labels[:,i] = self.stats.loc[i,'10%']
-            c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-            transformed_labels = c_org_latent
-            transformed_labels[:,i] = self.stats.loc[i,'50%']
-            c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-            transformed_labels = c_org_latent
-            transformed_labels[:,i] = self.stats.loc[i,'90%']
-            c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
+        if self.pca_variant == "quantiles":
+            for i in range(self.pca.n_components_):
+                transformed_labels = c_org_latent
+                transformed_labels[:, i] = self.stats.loc[i, "10%"]
+                c_trg_list.append(
+                    torch.FloatTensor(
+                        self.ss.inverse_transform(
+                            self.pca.inverse_transform(transformed_labels)
+                        )
+                    ).to(self.device)
+                )
+                transformed_labels = c_org_latent
+                transformed_labels[:, i] = self.stats.loc[i, "50%"]
+                c_trg_list.append(
+                    torch.FloatTensor(
+                        self.ss.inverse_transform(
+                            self.pca.inverse_transform(transformed_labels)
+                        )
+                    ).to(self.device)
+                )
+                transformed_labels = c_org_latent
+                transformed_labels[:, i] = self.stats.loc[i, "90%"]
+                c_trg_list.append(
+                    torch.FloatTensor(
+                        self.ss.inverse_transform(
+                            self.pca.inverse_transform(transformed_labels)
+                        )
+                    ).to(self.device)
+                )
 
-    else:
-        for i in range(1, self.pca.n_components_):
-            transformed_labels = c_org_latent
-            transformed_labels[:,i:] = 0
-            c_trg_list.append(torch.FloatTensor(self.ss.inverse_transform(self.pca.inverse_transform(transformed_labels))).to(self.device))
-    c_trg_list.append(torch.FloatTensor(c_org).to(self.device))
-    return c_trg_list
+        else:
+            for i in range(1, self.pca.n_components_):
+                transformed_labels = c_org_latent
+                transformed_labels[:, i:] = 0
+                c_trg_list.append(
+                    torch.FloatTensor(
+                        self.ss.inverse_transform(
+                            self.pca.inverse_transform(transformed_labels)
+                        )
+                    ).to(self.device)
+                )
+        c_trg_list.append(torch.FloatTensor(c_org).to(self.device))
+        return c_trg_list
+
 
 class Solver(object):
     """Solver for training and testing StarGAN."""
@@ -96,8 +139,8 @@ class Solver(object):
 
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if self.affectnet_emo_descr in ["64d_reg", "64d_cls"]:
             self.label_transform = LabelTransform(config)
 
         # Directories.
@@ -119,14 +162,27 @@ class Solver(object):
 
     def build_model(self):
         """Create a generator and a discriminator."""
-        if self.dataset in ['CelebA', 'RaFD', 'AffectNet']:
-            self.G = Generator(self.g_conv_dim, self.c_dim, self.g_repeat_num, self.depth_concat)
-            self.D = Discriminator(self.image_size, self.d_conv_dim, self.c_dim, self.d_repeat_num, self.affectnet_emo_descr, self.d_loss_cls_type)
+        if self.dataset in ["CelebA", "RaFD", "AffectNet"]:
+            self.G = Generator(
+                self.g_conv_dim, self.c_dim, self.g_repeat_num, self.depth_concat
+            )
+            self.D = Discriminator(
+                self.image_size,
+                self.d_conv_dim,
+                self.c_dim,
+                self.d_repeat_num,
+                self.affectnet_emo_descr,
+                self.d_loss_cls_type,
+            )
 
-        self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
-        self.d_optimizer = torch.optim.Adam(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
-        self.print_network(self.G, 'G')
-        self.print_network(self.D, 'D')
+        self.g_optimizer = torch.optim.Adam(
+            self.G.parameters(), self.g_lr, [self.beta1, self.beta2]
+        )
+        self.d_optimizer = torch.optim.Adam(
+            self.D.parameters(), self.d_lr, [self.beta1, self.beta2]
+        )
+        self.print_network(self.G, "G")
+        self.print_network(self.D, "D")
 
         self.G.to(self.device)
         self.D.to(self.device)
@@ -142,23 +198,28 @@ class Solver(object):
 
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
-        print('Loading the trained models from step {}...'.format(resume_iters))
-        G_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(resume_iters))
-        self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-        self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
+        print("Loading the trained models from step {}...".format(resume_iters))
+        G_path = os.path.join(self.model_save_dir, "{}-G.ckpt".format(resume_iters))
+        D_path = os.path.join(self.model_save_dir, "{}-D.ckpt".format(resume_iters))
+        self.G.load_state_dict(
+            torch.load(G_path, map_location=lambda storage, loc: storage)
+        )
+        self.D.load_state_dict(
+            torch.load(D_path, map_location=lambda storage, loc: storage)
+        )
 
     def build_tensorboard(self):
         """Build a tensorboard logger."""
         from logger import Logger
+
         self.logger = Logger(self.log_dir)
 
     def update_lr(self, g_lr, d_lr):
         """Decay learning rates of the generator and discriminator."""
         for param_group in self.g_optimizer.param_groups:
-            param_group['lr'] = g_lr
+            param_group["lr"] = g_lr
         for param_group in self.d_optimizer.param_groups:
-            param_group['lr'] = d_lr
+            param_group["lr"] = d_lr
 
     def reset_grad(self):
         """Reset the gradient buffers."""
@@ -173,16 +234,18 @@ class Solver(object):
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
         weight = torch.ones(y.size()).to(self.device)
-        dydx = torch.autograd.grad(outputs=y,
-                                   inputs=x,
-                                   grad_outputs=weight,
-                                   retain_graph=True,
-                                   create_graph=True,
-                                   only_inputs=True)[0]
+        dydx = torch.autograd.grad(
+            outputs=y,
+            inputs=x,
+            grad_outputs=weight,
+            retain_graph=True,
+            create_graph=True,
+            only_inputs=True,
+        )[0]
 
         dydx = dydx.view(dydx.size(0), -1)
-        dydx_l2norm = torch.sqrt(torch.sum(dydx**2, dim=1))
-        return torch.mean((dydx_l2norm-1)**2)
+        dydx_l2norm = torch.sqrt(torch.sum(dydx ** 2, dim=1))
+        return torch.mean((dydx_l2norm - 1) ** 2)
 
     def label2onehot(self, labels, dim):
         """Convert label indices to one-hot vectors."""
@@ -191,47 +254,54 @@ class Solver(object):
         out[np.arange(batch_size), labels.long()] = 1
         return out
 
-    def create_labels(self, c_org, c_dim=5, dataset='CelebA', selected_attrs=None):
+    def create_labels(self, c_org, c_dim=5, dataset="CelebA", selected_attrs=None):
         """Generate target domain labels for debugging and testing."""
-        if dataset in ['CelebA', 'RaFD']:
+        if dataset in ["CelebA", "RaFD"]:
             # Get hair color indices.
-            if dataset == 'CelebA':
+            if dataset == "CelebA":
                 hair_color_indices = []
                 for i, attr_name in enumerate(selected_attrs):
-                    if attr_name in ['Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Gray_Hair']:
+                    if attr_name in [
+                        "Black_Hair",
+                        "Blond_Hair",
+                        "Brown_Hair",
+                        "Gray_Hair",
+                    ]:
                         hair_color_indices.append(i)
 
             c_trg_list = []
             for i in range(c_dim):
-                if dataset == 'CelebA':
+                if dataset == "CelebA":
                     c_trg = c_org.clone()
-                    if i in hair_color_indices:  # Set one hair color to 1 and the rest to 0.
+                    if (
+                        i in hair_color_indices
+                    ):  # Set one hair color to 1 and the rest to 0.
                         c_trg[:, i] = 1
                         for j in hair_color_indices:
                             if j != i:
                                 c_trg[:, j] = 0
                     else:
-                        c_trg[:, i] = (c_trg[:, i] == 0)  # Reverse attribute value.
-                elif dataset == 'RaFD':
-                    c_trg = self.label2onehot(torch.ones(c_org.size(0))*i, c_dim)
+                        c_trg[:, i] = c_trg[:, i] == 0  # Reverse attribute value.
+                elif dataset == "RaFD":
+                    c_trg = self.label2onehot(torch.ones(c_org.size(0)) * i, c_dim)
 
                 c_trg_list.append(c_trg.to(self.device))
 
-        elif dataset == 'AffectNet':
+        elif dataset == "AffectNet":
             c_trg_list = []
-            if self.affectnet_emo_descr == 'emotiw':
+            if self.affectnet_emo_descr == "emotiw":
                 for i in range(c_dim):
-                    c_trg = self.label2onehot(torch.ones(c_org.size(0))*i, c_dim)
+                    c_trg = self.label2onehot(torch.ones(c_org.size(0)) * i, c_dim)
                     c_trg_list.append(c_trg.to(self.device))
-            elif self.affectnet_emo_descr == 'va':
-                for v in [-1., -0.5, 0., 0.5, 1.]:
-                    for a in [-1., -0.5, 0., 0.5, 1.]:
+            elif self.affectnet_emo_descr == "va":
+                for v in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+                    for a in [-1.0, -0.5, 0.0, 0.5, 1.0]:
                         c_trg = torch.Tensor([v, a]).repeat(c_org.size(0), 1)
                         c_trg_list.append(c_trg.to(self.device))
-            elif self.affectnet_emo_descr in ['64d_cls']:
-                c_trg_list = self.label_transform.create_labels(c_org[:,1:])
-            elif self.affectnet_emo_descr in ['64d_reg']:
-                c_trg_list = self.label_transform.create_labels(c_org[:,2:])
+            elif self.affectnet_emo_descr in ["64d_cls"]:
+                c_trg_list = self.label_transform.create_labels(c_org[:, 1:])
+            elif self.affectnet_emo_descr in ["64d_reg"]:
+                c_trg_list = self.label_transform.create_labels(c_org[:, 2:])
         return c_trg_list
 
     def ccc_loss(self, x, y):
@@ -239,46 +309,60 @@ class Solver(object):
         var_x = x.var(0)
         mu_y = y.mean(0)
         var_y = y.var(0)
-        cov_xy = torch.mean((x - mu_x.unsqueeze(0))*(y - mu_y.unsqueeze(0)), 0)
-        ccc = 2*cov_xy/(var_x + var_y + (mu_x - mu_y)**2)
+        cov_xy = torch.mean((x - mu_x.unsqueeze(0)) * (y - mu_y.unsqueeze(0)), 0)
+        ccc = 2 * cov_xy / (var_x + var_y + (mu_x - mu_y) ** 2)
         loss = 1 - ccc
         return loss.sum()
 
-    def classification_loss(self, logit, target, dataset='CelebA'):
+    def classification_loss(self, logit, target, dataset="CelebA"):
         """Compute binary or softmax cross entropy loss."""
-        if dataset == 'CelebA':
-            return F.binary_cross_entropy_with_logits(logit, target, reduction='sum') / logit.size(0)
-        elif dataset == 'RaFD':
+        if dataset == "CelebA":
+            return F.binary_cross_entropy_with_logits(
+                logit, target, reduction="sum"
+            ) / logit.size(0)
+        elif dataset == "RaFD":
             return F.cross_entropy(logit, target)
-        elif dataset == 'AffectNet':
-            if self.affectnet_emo_descr in ['emotiw']:
+        elif dataset == "AffectNet":
+            if self.affectnet_emo_descr in ["emotiw"]:
                 return F.cross_entropy(logit, target)
-            elif self.affectnet_emo_descr in ['va']:
+            elif self.affectnet_emo_descr in ["va"]:
                 if self.use_ccc:
                     return self.ccc_loss(logit, target)
                 else:
                     return F.mse_loss(logit, target)
-            elif self.affectnet_emo_descr in ['64d_reg']:
+            elif self.affectnet_emo_descr in ["64d_reg"]:
                 logit_pred, logit_actv = logit
                 target_pred, target_actv = target
                 out = 0
                 if logit_pred is not None:
                     if self.use_ccc:
-                        out += self.lambda_cls2/self.lambda_cls*self.ccc_loss(logit_pred, target_pred)
+                        out += (
+                            self.lambda_cls2
+                            / self.lambda_cls
+                            * self.ccc_loss(logit_pred, target_pred)
+                        )
                     else:
-                        out += self.lambda_cls2/self.lambda_cls*F.mse_loss(logit_pred, target_pred)
+                        out += (
+                            self.lambda_cls2
+                            / self.lambda_cls
+                            * F.mse_loss(logit_pred, target_pred)
+                        )
                 if logit_actv is not None:
                     if self.use_ccc:
                         out += self.ccc_loss(logit_actv, target_actv)
                     else:
                         out += F.mse_loss(logit_actv, target_actv)
                 return out
-            elif self.affectnet_emo_descr in ['64d_cls']:
+            elif self.affectnet_emo_descr in ["64d_cls"]:
                 logit_pred, logit_actv = logit
                 target_pred, target_actv = target
                 out = 0
                 if logit_pred is not None:
-                    out += self.lambda_cls2/self.lambda_cls*F.cross_entropy(logit_pred, target_pred)
+                    out += (
+                        self.lambda_cls2
+                        / self.lambda_cls
+                        * F.cross_entropy(logit_pred, target_pred)
+                    )
                 if logit_actv is not None:
                     if self.use_ccc:
                         out += self.ccc_loss(logit_actv, target_actv)
@@ -289,18 +373,20 @@ class Solver(object):
     def train(self):
         """Train StarGAN within a single dataset."""
         # Set data loader.
-        if self.dataset == 'CelebA':
+        if self.dataset == "CelebA":
             data_loader = self.celeba_loader
-        elif self.dataset == 'RaFD':
+        elif self.dataset == "RaFD":
             data_loader = self.rafd_loader
-        elif self.dataset == 'AffectNet':
+        elif self.dataset == "AffectNet":
             data_loader = self.affectnet_loader
 
         # Fetch fixed inputs for debugging.
         data_iter = iter(data_loader)
         x_fixed, c_org = next(data_iter)
         x_fixed = x_fixed.to(self.device)
-        c_fixed_list = self.create_labels(c_org, self.c_dim, self.dataset, self.selected_attrs)
+        c_fixed_list = self.create_labels(
+            c_org, self.c_dim, self.dataset, self.selected_attrs
+        )
 
         # Learning rate cache for decaying.
         g_lr = self.g_lr
@@ -313,7 +399,7 @@ class Solver(object):
             self.restore_model(self.resume_iters)
 
         # Start training.
-        print('Start training...')
+        print("Start training...")
         start_time = time.time()
         for i in range(start_iters, self.num_iters):
 
@@ -332,45 +418,59 @@ class Solver(object):
             rand_idx = torch.randperm(label_org.size(0))
             label_trg = label_org[rand_idx]
 
-            if self.dataset == 'CelebA':
+            if self.dataset == "CelebA":
                 c_org = label_org.clone().to(self.device)
                 c_trg = label_trg.clone().to(self.device)
-                label_org = label_org.to(self.device)       # Labels for computing classification loss.
-                label_trg = label_trg.to(self.device)       # Labels for computing classification loss.
-            elif self.dataset == 'RaFD':
+                label_org = label_org.to(
+                    self.device
+                )  # Labels for computing classification loss.
+                label_trg = label_trg.to(
+                    self.device
+                )  # Labels for computing classification loss.
+            elif self.dataset == "RaFD":
                 c_org = self.label2onehot(label_org, self.c_dim).to(self.device)
                 c_trg = self.label2onehot(label_trg, self.c_dim).to(self.device)
-                label_org = label_org.to(self.device)       # Labels for computing classification loss.
-                label_trg = label_trg.to(self.device)       # Labels for computing classification loss.
-            elif self.dataset == 'AffectNet':
-                if self.affectnet_emo_descr == 'emotiw':
+                label_org = label_org.to(
+                    self.device
+                )  # Labels for computing classification loss.
+                label_trg = label_trg.to(
+                    self.device
+                )  # Labels for computing classification loss.
+            elif self.dataset == "AffectNet":
+                if self.affectnet_emo_descr == "emotiw":
                     c_org = self.label2onehot(label_org, self.c_dim).to(self.device)
                     c_trg = self.label2onehot(label_trg, self.c_dim).to(self.device)
-                    label_org = label_org.to(self.device)       # Labels for computing classification loss.
-                    label_trg = label_trg.to(self.device)       # Labels for computing classification loss.
-                elif self.affectnet_emo_descr == 'va':
+                    label_org = label_org.to(
+                        self.device
+                    )  # Labels for computing classification loss.
+                    label_trg = label_trg.to(
+                        self.device
+                    )  # Labels for computing classification loss.
+                elif self.affectnet_emo_descr == "va":
                     c_org = label_org.clone().to(self.device)
                     c_trg = label_trg.clone().to(self.device)
-                    label_org = label_org.to(self.device)       # Labels for computing classification loss.
-                    label_trg = label_trg.to(self.device)       # Labels for computing classification loss.
-                elif self.affectnet_emo_descr == '64d_cls':
-                    pred_org = label_org[:,0].clone().long().to(self.device)
-                    pred_trg = label_trg[:,0].clone().long().to(self.device)
-                    actv_org = label_org[:,1:].to(self.device)
-                    actv_trg = label_trg[:,1:].to(self.device)
+                    label_org = label_org.to(
+                        self.device
+                    )  # Labels for computing classification loss.
+                    label_trg = label_trg.to(
+                        self.device
+                    )  # Labels for computing classification loss.
+                elif self.affectnet_emo_descr == "64d_cls":
+                    pred_org = label_org[:, 0].clone().long().to(self.device)
+                    pred_trg = label_trg[:, 0].clone().long().to(self.device)
+                    actv_org = label_org[:, 1:].to(self.device)
+                    actv_trg = label_trg[:, 1:].to(self.device)
                     c_org = actv_org.clone().to(self.device)
                     c_trg = actv_trg.clone().to(self.device)
-                elif self.affectnet_emo_descr == '64d_reg':
-                    pred_org = label_org[:,:2].clone().float().to(self.device)
-                    pred_trg = label_trg[:,:2].clone().float().to(self.device)
-                    actv_org = label_org[:,2:].to(self.device)
-                    actv_trg = label_trg[:,2:].to(self.device)
+                elif self.affectnet_emo_descr == "64d_reg":
+                    pred_org = label_org[:, :2].clone().float().to(self.device)
+                    pred_trg = label_trg[:, :2].clone().float().to(self.device)
+                    actv_org = label_org[:, 2:].to(self.device)
+                    actv_trg = label_trg[:, 2:].to(self.device)
                     c_org = actv_org.clone().to(self.device)
                     c_trg = actv_trg.clone().to(self.device)
 
-
-            x_real = x_real.to(self.device)           # Input images.
-
+            x_real = x_real.to(self.device)  # Input images.
 
             # =================================================================================== #
             #                             2. Train the discriminator                              #
@@ -378,15 +478,23 @@ class Solver(object):
 
             # Compute loss with real images.
             out_src, out_cls = self.D(x_real)
-            d_loss_real = - torch.mean(out_src)
+            d_loss_real = -torch.mean(out_src)
 
-            if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
-                if self.d_loss_cls_type == 'actv':
-                    d_loss_cls = self.classification_loss((None, out_cls), (None, actv_org), self.dataset)
-                elif self.d_loss_cls_type == 'pred':
-                    d_loss_cls = self.classification_loss((self.D.fc(out_cls), None), (pred_org, None), self.dataset)
+            if self.affectnet_emo_descr in ["64d_reg", "64d_cls"]:
+                if self.d_loss_cls_type == "actv":
+                    d_loss_cls = self.classification_loss(
+                        (None, out_cls), (None, actv_org), self.dataset
+                    )
+                elif self.d_loss_cls_type == "pred":
+                    d_loss_cls = self.classification_loss(
+                        (self.D.fc(out_cls), None), (pred_org, None), self.dataset
+                    )
                 else:
-                    d_loss_cls = self.classification_loss((self.D.fc(out_cls), out_cls), (pred_org, actv_org), self.dataset)
+                    d_loss_cls = self.classification_loss(
+                        (self.D.fc(out_cls), out_cls),
+                        (pred_org, actv_org),
+                        self.dataset,
+                    )
             else:
                 d_loss_cls = self.classification_loss(out_cls, label_org, self.dataset)
 
@@ -397,101 +505,129 @@ class Solver(object):
 
             # Compute loss for gradient penalty.
             alpha = torch.rand(x_real.size(0), 1, 1, 1).to(self.device)
-            x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(True)
+            x_hat = (alpha * x_real.data + (1 - alpha) * x_fake.data).requires_grad_(
+                True
+            )
             out_src, _ = self.D(x_hat)
             d_loss_gp = self.gradient_penalty(out_src, x_hat)
 
             # Backward and optimize.
-            d_loss = d_loss_real + d_loss_fake + self.lambda_cls * d_loss_cls + self.lambda_gp * d_loss_gp
+            d_loss = (
+                d_loss_real
+                + d_loss_fake
+                + self.lambda_cls * d_loss_cls
+                + self.lambda_gp * d_loss_gp
+            )
             self.reset_grad()
             d_loss.backward()
             self.d_optimizer.step()
 
             # Logging.
             loss = {}
-            loss['D/loss_real'] = d_loss_real.item()
-            loss['D/loss_fake'] = d_loss_fake.item()
-            loss['D/loss_cls'] = d_loss_cls.item()
-            loss['D/loss_gp'] = d_loss_gp.item()
+            loss["D/loss_real"] = d_loss_real.item()
+            loss["D/loss_fake"] = d_loss_fake.item()
+            loss["D/loss_cls"] = d_loss_cls.item()
+            loss["D/loss_gp"] = d_loss_gp.item()
 
             # =================================================================================== #
             #                               3. Train the generator                                #
             # =================================================================================== #
 
-            if (i+1) % self.n_critic == 0:
+            if (i + 1) % self.n_critic == 0:
                 # Original-to-target domain.
                 x_fake = self.G(x_real, c_trg)
                 out_src, out_cls = self.D(x_fake)
-                g_loss_fake = - torch.mean(out_src)
+                g_loss_fake = -torch.mean(out_src)
 
-                if self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
-                    if self.d_loss_cls_type == 'actv':
-                        g_loss_cls = self.classification_loss((None, out_cls), (None, actv_trg), self.dataset)
-                    elif self.d_loss_cls_type == 'pred':
-                        g_loss_cls = self.classification_loss((self.D.fc(out_cls), None), (pred_trg, None), self.dataset)
+                if self.affectnet_emo_descr in ["64d_reg", "64d_cls"]:
+                    if self.d_loss_cls_type == "actv":
+                        g_loss_cls = self.classification_loss(
+                            (None, out_cls), (None, actv_trg), self.dataset
+                        )
+                    elif self.d_loss_cls_type == "pred":
+                        g_loss_cls = self.classification_loss(
+                            (self.D.fc(out_cls), None), (pred_trg, None), self.dataset
+                        )
                     else:
-                        g_loss_cls = self.classification_loss((self.D.fc(out_cls), out_cls), (pred_trg, actv_trg), self.dataset)
+                        g_loss_cls = self.classification_loss(
+                            (self.D.fc(out_cls), out_cls),
+                            (pred_trg, actv_trg),
+                            self.dataset,
+                        )
                 else:
-                    g_loss_cls = self.classification_loss(out_cls, label_trg, self.dataset)
+                    g_loss_cls = self.classification_loss(
+                        out_cls, label_trg, self.dataset
+                    )
 
                 # Target-to-original domain.
                 x_reconst = self.G(x_fake, c_org)
                 g_loss_rec = torch.mean(torch.abs(x_real - x_reconst))
 
                 # Backward and optimize.
-                g_loss = g_loss_fake + self.lambda_rec * g_loss_rec + self.lambda_cls * g_loss_cls
+                g_loss = (
+                    g_loss_fake
+                    + self.lambda_rec * g_loss_rec
+                    + self.lambda_cls * g_loss_cls
+                )
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()
 
                 # Logging.
-                loss['G/loss_fake'] = g_loss_fake.item()
-                loss['G/loss_rec'] = g_loss_rec.item()
-                loss['G/loss_cls'] = g_loss_cls.item()
+                loss["G/loss_fake"] = g_loss_fake.item()
+                loss["G/loss_rec"] = g_loss_rec.item()
+                loss["G/loss_cls"] = g_loss_cls.item()
 
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #
             # =================================================================================== #
 
             # Print out training information.
-            if (i+1) % self.log_step == 0:
+            if (i + 1) % self.log_step == 0:
                 et = time.time() - start_time
                 et = str(datetime.timedelta(seconds=et))[:-7]
-                log = "Elapsed [{}], Iteration [{}/{}]".format(et, i+1, self.num_iters)
+                log = "Elapsed [{}], Iteration [{}/{}]".format(
+                    et, i + 1, self.num_iters
+                )
                 for tag, value in loss.items():
                     log += ", {}: {:.4f}".format(tag, value)
                 print(log)
 
                 if self.use_tensorboard:
                     for tag, value in loss.items():
-                        self.logger.scalar_summary(tag, value, i+1)
+                        self.logger.scalar_summary(tag, value, i + 1)
 
             # Translate fixed images for debugging.
-            if (i+1) % self.sample_step == 0:
+            if (i + 1) % self.sample_step == 0:
                 with torch.no_grad():
                     x_fake_list = [x_fixed]
                     for c_fixed in c_fixed_list:
                         x_fake_list.append(self.G(x_fixed, c_fixed))
                     x_concat = torch.cat(x_fake_list, dim=3)
-                    sample_path = os.path.join(self.sample_dir, '{}-images.jpg'.format(i+1))
-                    save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
-                    print('Saved real and fake images into {}...'.format(sample_path))
+                    sample_path = os.path.join(
+                        self.sample_dir, "{}-images.jpg".format(i + 1)
+                    )
+                    save_image(
+                        self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0
+                    )
+                    print("Saved real and fake images into {}...".format(sample_path))
 
             # Save model checkpoints.
-            if (i+1) % self.model_save_step == 0:
-                G_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(i+1))
-                D_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(i+1))
+            if (i + 1) % self.model_save_step == 0:
+                G_path = os.path.join(self.model_save_dir, "{}-G.ckpt".format(i + 1))
+                D_path = os.path.join(self.model_save_dir, "{}-D.ckpt".format(i + 1))
                 torch.save(self.G.state_dict(), G_path)
                 torch.save(self.D.state_dict(), D_path)
-                print('Saved model checkpoints into {}...'.format(self.model_save_dir))
+                print("Saved model checkpoints into {}...".format(self.model_save_dir))
 
             # Decay learning rates.
-            if (i+1) % self.lr_update_step == 0 and (i+1) > (self.num_iters - self.num_iters_decay):
-                g_lr -= (self.g_lr / float(self.num_iters_decay))
-                d_lr -= (self.d_lr / float(self.num_iters_decay))
+            if (i + 1) % self.lr_update_step == 0 and (i + 1) > (
+                self.num_iters - self.num_iters_decay
+            ):
+                g_lr -= self.g_lr / float(self.num_iters_decay)
+                d_lr -= self.d_lr / float(self.num_iters_decay)
                 self.update_lr(g_lr, d_lr)
-                print ('Decayed learning rates, g_lr: {}, d_lr: {}.'.format(g_lr, d_lr))
-
+                print("Decayed learning rates, g_lr: {}, d_lr: {}.".format(g_lr, d_lr))
 
     def test(self):
         """Translate images using StarGAN trained on a single dataset."""
@@ -499,11 +635,11 @@ class Solver(object):
         self.restore_model(self.test_iters)
 
         # Set data loader.
-        if self.dataset == 'CelebA':
+        if self.dataset == "CelebA":
             data_loader = self.celeba_loader
-        elif self.dataset == 'RaFD':
+        elif self.dataset == "RaFD":
             data_loader = self.rafd_loader
-        elif self.dataset == 'AffectNet':
+        elif self.dataset == "AffectNet":
             data_loader = self.affectnet_loader
 
         with torch.no_grad():
@@ -511,7 +647,9 @@ class Solver(object):
 
                 # Prepare input images and target domain labels.
                 x_real = x_real.to(self.device)
-                c_trg_list = self.create_labels(c_org, self.c_dim, self.dataset, self.selected_attrs)
+                c_trg_list = self.create_labels(
+                    c_org, self.c_dim, self.dataset, self.selected_attrs
+                )
 
                 # Translate images.
                 x_fake_list = [x_real]
@@ -520,7 +658,11 @@ class Solver(object):
 
                 # Save the translated images.
                 x_concat = torch.cat(x_fake_list, dim=3)
-                result_path = os.path.join(self.result_dir, '{}-images.jpg'.format(i+1))
+                result_path = os.path.join(
+                    self.result_dir, "{}-images.jpg".format(i + 1)
+                )
                 # result_path = os.path.join(self.result_dir, '{}.jpg'.format(self.model_save_dir.replace("/vol/bitbucket/apg416/","").replace("/models","")))
-                save_image(self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0)
-                print('Saved real and fake images into {}...'.format(result_path))
+                save_image(
+                    self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0
+                )
+                print("Saved real and fake images into {}...".format(result_path))

@@ -23,14 +23,14 @@ class CelebA(data.Dataset):
         self.idx2attr = {}
         self.preprocess()
 
-        if mode == 'train':
+        if mode == "train":
             self.num_images = len(self.train_dataset)
         else:
             self.num_images = len(self.test_dataset)
 
     def preprocess(self):
         """Preprocess the CelebA attribute file."""
-        lines = [line.rstrip() for line in open(self.attr_path, 'r')]
+        lines = [line.rstrip() for line in open(self.attr_path, "r")]
         all_attr_names = lines[1].split()
         for i, attr_name in enumerate(all_attr_names):
             self.attr2idx[attr_name] = i
@@ -47,18 +47,18 @@ class CelebA(data.Dataset):
             label = []
             for attr_name in self.selected_attrs:
                 idx = self.attr2idx[attr_name]
-                label.append(values[idx] == '1')
+                label.append(values[idx] == "1")
 
-            if (i+1) < 2000:
+            if (i + 1) < 2000:
                 self.test_dataset.append([filename, label])
             else:
                 self.train_dataset.append([filename, label])
 
-        print('Finished preprocessing the CelebA dataset...')
+        print("Finished preprocessing the CelebA dataset...")
 
     def __getitem__(self, index):
         """Return one image and its corresponding attribute label."""
-        dataset = self.train_dataset if self.mode == 'train' else self.test_dataset
+        dataset = self.train_dataset if self.mode == "train" else self.test_dataset
         filename, label = dataset[index]
         image = Image.open(os.path.join(self.image_dir, filename))
         return self.transform(image), torch.FloatTensor(label)
@@ -81,70 +81,147 @@ class AffectNet(data.Dataset):
         self.test_dataset = []
         self.preprocess()
 
-        if mode == 'train':
+        if mode == "train":
             self.num_images = len(self.train_dataset)
         else:
             self.num_images = len(self.test_dataset)
 
-
     def preprocess(self):
         """Preprocess the AffectNet emotional description file."""
-        if self.affectnet_emo_descr == 'emotiw':
-            lines_train = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_train_emotiw.txt'), 'r')]
+        if self.affectnet_emo_descr == "emotiw":
+            lines_train = [
+                line.rstrip()
+                for line in open(
+                    os.path.join(self.image_dir, "_affectnet_train_emotiw.txt"), "r"
+                )
+            ]
             for line in lines_train:
                 filename, label = line.split()
                 self.train_dataset.append([filename, int(label)])
-            lines_test = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_test_emotiw.txt'), 'r')]
+            lines_test = [
+                line.rstrip()
+                for line in open(
+                    os.path.join(self.image_dir, "_affectnet_test_emotiw.txt"), "r"
+                )
+            ]
             for line in lines_test:
                 filename, label = line.split()
                 self.test_dataset.append([filename, int(label)])
-        elif self.affectnet_emo_descr == 'va':
-            lines_train = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_train_va.txt'), 'r')]
+        elif self.affectnet_emo_descr == "va":
+            lines_train = [
+                line.rstrip()
+                for line in open(
+                    os.path.join(self.image_dir, "_affectnet_train_va.txt"), "r"
+                )
+            ]
             for line in lines_train:
                 split = line.split()
                 filename, v, a = split
                 self.train_dataset.append([filename, [float(v), float(a)]])
-            lines_test = [line.rstrip() for line in open(os.path.join(self.image_dir, '_affectnet_test_va.txt'), 'r')]
+            lines_test = [
+                line.rstrip()
+                for line in open(
+                    os.path.join(self.image_dir, "_affectnet_test_va.txt"), "r"
+                )
+            ]
             for line in lines_test:
                 split = line.split()
                 filename, v, a = split
                 self.test_dataset.append([filename, [float(v), float(a)]])
-        elif self.affectnet_emo_descr == '64d_cls':
-            for mode, dataset in zip(['train', 'test'], [self.train_dataset, self.test_dataset]):
-                filenames = [line.rstrip() for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'images.txt'), 'r')]
-                labels = [[int(line.rstrip())] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'labels.txt'), 'r')]
-                predictions = [[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'predictions.txt'), 'r')]
+        elif self.affectnet_emo_descr == "64d_cls":
+            for mode, dataset in zip(
+                ["train", "test"], [self.train_dataset, self.test_dataset]
+            ):
+                filenames = [
+                    line.rstrip()
+                    for line in open(
+                        os.path.join(
+                            self.image_dir, self.affectnet_emo_descr, mode, "images.txt"
+                        ),
+                        "r",
+                    )
+                ]
+                labels = [
+                    [int(line.rstrip())]
+                    for line in open(
+                        os.path.join(
+                            self.image_dir, self.affectnet_emo_descr, mode, "labels.txt"
+                        ),
+                        "r",
+                    )
+                ]
+                predictions = [
+                    [float(x) for x in line.rstrip().split()]
+                    for line in open(
+                        os.path.join(
+                            self.image_dir,
+                            self.affectnet_emo_descr,
+                            mode,
+                            "predictions.txt",
+                        ),
+                        "r",
+                    )
+                ]
                 dataset += list(zip(filenames, labels, predictions))
-        elif self.affectnet_emo_descr == '64d_reg':
-            for mode, dataset in zip(['train', 'test'], [self.train_dataset, self.test_dataset]):
-                filenames = [line.rstrip() for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'images.txt'), 'r')]
-                labels = [[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'labels.txt'), 'r')]
-                predictions = [[float(x) for x in line.rstrip().split()] for line in open(os.path.join(self.image_dir, self.affectnet_emo_descr, mode, 'predictions.txt'), 'r')]
+        elif self.affectnet_emo_descr == "64d_reg":
+            for mode, dataset in zip(
+                ["train", "test"], [self.train_dataset, self.test_dataset]
+            ):
+                filenames = [
+                    line.rstrip()
+                    for line in open(
+                        os.path.join(
+                            self.image_dir, self.affectnet_emo_descr, mode, "images.txt"
+                        ),
+                        "r",
+                    )
+                ]
+                labels = [
+                    [float(x) for x in line.rstrip().split()]
+                    for line in open(
+                        os.path.join(
+                            self.image_dir, self.affectnet_emo_descr, mode, "labels.txt"
+                        ),
+                        "r",
+                    )
+                ]
+                predictions = [
+                    [float(x) for x in line.rstrip().split()]
+                    for line in open(
+                        os.path.join(
+                            self.image_dir,
+                            self.affectnet_emo_descr,
+                            mode,
+                            "predictions.txt",
+                        ),
+                        "r",
+                    )
+                ]
                 dataset += list(zip(filenames, labels, predictions))
 
-        print('Finished preprocessing the AffectNet dataset...')
+        print("Finished preprocessing the AffectNet dataset...")
 
     def __getitem__(self, index):
         """Return one image and its corresponding attribute label."""
-        if self.affectnet_emo_descr in ['emotiw', 'va']:
-            if self.mode == 'train':
+        if self.affectnet_emo_descr in ["emotiw", "va"]:
+            if self.mode == "train":
                 dataset = self.train_dataset
                 filename, label = dataset[index]
-                image = Image.open(os.path.join(self.image_dir, 'train', filename))
+                image = Image.open(os.path.join(self.image_dir, "train", filename))
             else:
                 dataset = self.test_dataset
                 filename, label = dataset[index]
-                image = Image.open(os.path.join(self.image_dir, 'validation', filename))
+                image = Image.open(os.path.join(self.image_dir, "validation", filename))
             return self.transform(image), torch.tensor(label)
-        elif self.affectnet_emo_descr in ['64d_reg', '64d_cls']:
-            if self.mode == 'train':
+        elif self.affectnet_emo_descr in ["64d_reg", "64d_cls"]:
+            if self.mode == "train":
                 dataset = self.train_dataset
                 filename, label, prediction = dataset[index]
-                image = Image.open(os.path.join(self.image_dir, 'train', filename))
+                image = Image.open(os.path.join(self.image_dir, "train", filename))
             else:
                 dataset = self.test_dataset
                 filename, label, prediction = dataset[index]
-                image = Image.open(os.path.join(self.image_dir, 'validation', filename))
+                image = Image.open(os.path.join(self.image_dir, "validation", filename))
             return self.transform(image), torch.tensor(label + prediction)
 
     def __len__(self):
@@ -152,11 +229,21 @@ class AffectNet(data.Dataset):
         return self.num_images
 
 
-def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=128,
-               batch_size=16, dataset='CelebA', mode='train', affectnet_emo_descr='emotiw', num_workers=1):
+def get_loader(
+    image_dir,
+    attr_path,
+    selected_attrs,
+    crop_size=178,
+    image_size=128,
+    batch_size=16,
+    dataset="CelebA",
+    mode="train",
+    affectnet_emo_descr="emotiw",
+    num_workers=1,
+):
     """Build and return a data loader."""
     transform = []
-    if mode == 'train':
+    if mode == "train":
         transform.append(T.RandomHorizontalFlip())
     transform.append(T.CenterCrop(crop_size))
     transform.append(T.Resize(image_size))
@@ -164,15 +251,17 @@ def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=1
     transform.append(T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
     transform = T.Compose(transform)
 
-    if dataset == 'CelebA':
+    if dataset == "CelebA":
         dataset = CelebA(image_dir, attr_path, selected_attrs, transform, mode)
-    elif dataset == 'RaFD':
+    elif dataset == "RaFD":
         dataset = ImageFolder(image_dir, transform)
-    elif dataset == 'AffectNet':
+    elif dataset == "AffectNet":
         dataset = AffectNet(image_dir, affectnet_emo_descr, transform, mode)
 
-    data_loader = data.DataLoader(dataset=dataset,
-                                  batch_size=batch_size,
-                                  shuffle=(mode=='train'),
-                                  num_workers=num_workers)
+    data_loader = data.DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=(mode == "train"),
+        num_workers=num_workers,
+    )
     return data_loader
