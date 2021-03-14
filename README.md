@@ -10,7 +10,7 @@
 * We can decipher which aspects of the image are encoded by intermediate representations by training a generative model which conditions on these representations.
 
 ### Model Outline
-* [StarGAN](https://arxiv.org/abs/1711.09020) is a powerful model for image-to-image translation i.e. problem of generating an artifical image based on a source image, typically by altering some qualitative aspect of the input.
+* [StarGAN](https://arxiv.org/abs/1711.09020) is a powerful model for image-to-image translation i.e. problem of generating an artificial image based on a source image, typically by altering some qualitative aspect of the input.
 * It generates fake image from source image conditional on a prescribed target domain label (represented as a one-hot/binary vector).
 * In this work we show that analogous training principle can be used to generate meaningful samples when the conditioning vectors are continuous feature vectors extracted from the last layer of a trained classifier.
 * Such model allows for direct visualization and interpretation of the feature space.
